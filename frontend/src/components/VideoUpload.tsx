@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 const VideoUpload = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedModel, setSelectedModel] = useState('o4-mini');
   const navigate = useNavigate();
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -42,6 +43,7 @@ const VideoUpload = () => {
 
     const formData = new FormData();
     formData.append('video', selectedFile);
+    formData.append('model', selectedModel);
     
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
@@ -92,6 +94,9 @@ const VideoUpload = () => {
                 >
                   Select Video
                 </label>
+                <div className="mt-4">
+                  <a href="https://drive.google.com/drive/folders/1IGPDYU8ZfAG0QluCnfzYrpm2a8T3s1rE?usp=drive_link" className="text-blue-500 hover:text-blue-600">Click here for demo videos</a>
+                </div>
               </>
             ) : (
               <div className="space-y-4">
@@ -117,6 +122,20 @@ const VideoUpload = () => {
                 >
                   Analyze Video
                 </button>
+                <div className="mt-4">
+                  <label htmlFor="modelSelect" className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Model
+                  </label>
+                  <select
+                    id="modelSelect"
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="o4-mini">o4-mini</option>
+                    <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+                  </select>
+                </div>
               </div>
             )}
           </div>

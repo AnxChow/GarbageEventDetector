@@ -59,12 +59,13 @@ app.post('/upload', upload.single('video'), async (req, res) => {
 
   console.log(`📥 Video received: ${req.file.originalname} (${req.file.size} bytes)`);
   const fileId = req.file.filename;
+  const model = req.body.model || 'o4-mini';
   processingStatus.set(fileId, { status: 'processing', events: [] });
 
   try {
     // Start processing in the background
-    processVideo(fileId, req.file.path);
-    console.log(`✅ Video uploaded successfully, starting processing for ${fileId}`);
+    processVideo(fileId, req.file.path, model);
+    console.log(`✅ Video uploaded successfully, starting processing for ${fileId} with model ${model}`);
     res.json({ message: 'Video uploaded successfully', fileId });
   } catch (error) {
     console.error('❌ Error starting video processing:', error);
@@ -167,9 +168,9 @@ app.post('/event-feedback/:fileId/:eventId', (req, res) => {
   res.json({ message: 'Event feedback saved', event });
 });
 
-async function processVideo(fileId: string, videoPath: string) {
+async function processVideo(fileId: string, videoPath: string, model: string) {
   try {
-    console.log(`🎥 Starting frame extraction for ${fileId}`);
+    console.log(`🎥 Starting frame extraction for ${fileId} with model ${model}`);
     // Extract frames
     const frames = await videoProcessor.extractFrames(videoPath);
     console.log(`✅ Extracted ${frames.length} frames from video`);
@@ -188,7 +189,7 @@ async function processVideo(fileId: string, videoPath: string) {
     const processFrame = async (frame: any, i: number) => {
       console.log(`[Frame ${i}] Starting analysis at ${frame.timestamp}`);
       try {
-        let event: any = await llmService.analyzeFrame(frame.framePath, frame.timestamp);
+        let event: any = await llmService.analyzeFrame(frame.framePath, frame.timestamp, model);
         console.log(`[Frame ${i}] Analysis complete:`, event);
         let eventType = 'not flagged';
         let reason = 'not flagged';

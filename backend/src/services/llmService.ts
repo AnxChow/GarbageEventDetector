@@ -22,7 +22,7 @@ export class LLMService {
     });
   }
 
-  async analyzeFrame(framePath: string, timestamp: string): Promise<Event | null> {
+  async analyzeFrame(framePath: string, timestamp: string, model: string = 'o4-mini'): Promise<Event | null> {
     try {
       // Read the image file
       const imageBuffer = await fs.readFile(framePath);
@@ -51,7 +51,7 @@ export class LLMService {
             The bins you identify should NOT be the garbage truck's own collection bin.`;
 
       const binCheckResponse = await this.openai.chat.completions.create({
-        model: "o4-mini",
+        model: model,
         messages: [
           {
             role: "user",
@@ -100,7 +100,6 @@ Check for the following types of events:
 1. **"inaccessible"** — A bin cannot be picked up because:
    - It is **blocked** by other bins, objects, cars, or a fence.
    - It is **facing the wrong direction** (handles/lid turned away from the truck).
-   - It is placed **on the sidewalk** instead of the road.
    - ✅ Only report "inaccessible" if the bin is **clearly unreachable or improperly placed**. 
 
 2. **"overflowing"** — A bin is clearly too full:
@@ -121,7 +120,7 @@ Return your result in this exact JSON format:
 `;
 
       const issueCheckResponse = await this.openai.chat.completions.create({
-        model: "o4-mini",
+        model: model,
         messages: [
           {
             role: "user",
