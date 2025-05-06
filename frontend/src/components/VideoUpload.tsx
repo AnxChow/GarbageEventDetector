@@ -95,20 +95,21 @@ const VideoUpload = () => {
               </>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm">
-                  <div className="flex items-center space-x-3">
+                <div className="bg-white p-4 rounded-lg shadow-sm flex justify-center">
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
                     <span className="text-gray-700">{selectedFile.name}</span>
+                    <button
+                      onClick={handleDelete}
+                      className="p-1 ml-2 rounded-full hover:bg-red-100 transition-colors"
+                      title="Remove video"
+                      aria-label="Delete video"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <svg width="22" height="22" fill="none" stroke="#ef4444" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
-                  <button
-                    onClick={handleDelete}
-                    className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                    title="Remove video"
-                  >
-                    Delete
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </div>
                 <button
                   onClick={handleAnalyze}

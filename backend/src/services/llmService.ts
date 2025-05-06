@@ -47,7 +47,7 @@ export class LLMService {
       Be conservative. Only return "binsPresent": true if there is clear and confident visual evidence of bins on the ground, at the side, ready to be serviced. The bins you identify should NOT be the garbage truck's own collection bin.`;
 
       const binCheckResponse = await this.openai.chat.completions.create({
-        model: "gpt-4.1-2025-04-14",
+        model: "o4-mini",
         messages: [
           {
             role: "user",
@@ -61,8 +61,8 @@ export class LLMService {
               }
             ]
           }
-        ],
-        max_tokens: 500
+        ]
+        // max_tokens: 500
       });
 
       let binCheckResult;
@@ -105,7 +105,7 @@ export class LLMService {
       Be conservative — if it is not clearly visible and unambiguous, return null.`;
 
       const issueCheckResponse = await this.openai.chat.completions.create({
-        model: "gpt-4.1-2025-04-14",
+        model: "o4-mini",
         messages: [
           {
             role: "user",
@@ -119,8 +119,8 @@ export class LLMService {
               }
             ]
           }
-        ],
-        max_tokens: 500
+        ]
+        // max_tokens: 500
       });
 
       let issueCheckResult;
