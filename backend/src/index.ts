@@ -14,6 +14,23 @@ const port = process.env.PORT || 3000;
 const videoProcessor = new VideoProcessor();
 const llmService = new LLMService();
 
+// Ensure uploads directory exists
+const ensureUploadsDirectory = async () => {
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  const framesDir = path.join(uploadsDir, 'frames');
+  
+  try {
+    await fs.mkdir(uploadsDir, { recursive: true });
+    await fs.mkdir(framesDir, { recursive: true });
+    console.log('✅ Uploads directories created successfully');
+  } catch (error) {
+    console.error('❌ Error creating uploads directories:', error);
+  }
+};
+
+// Initialize uploads directory
+ensureUploadsDirectory();
+
 // Middleware
 app.use(cors());
 app.use(express.json());
