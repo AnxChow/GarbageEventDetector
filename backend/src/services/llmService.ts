@@ -30,14 +30,12 @@ export class LLMService {
       // Step 1: Check if there are bins ready for pickup
       const binCheckPrompt = `You are analyzing a single frame from a garbage truck's dashcam at timestamp ${timestamp}.
 
-      Your task is to determine whether there are any **trash bins** that meet **all** of the following criteria:
+      Your task is to determine whether there are any **trash bins** that meet the following criteria:
       
-      1. The bin is **on the ground** (i.e., not lifted, tilted, or inside the truck's gripper).
-      2. The bin is **close to the side of the truck** and appears to be the **next target for pickup**.
-      3. The bin is **clearly visible and identifiable** as a standard trash bin.
+      1. The bin is **close to the side of the truck** and appears to be the **next target for pickup**.
+      2. The bin is **clearly visible and identifiable** as a standard trash bin.
       
       🚫 Ignore:
-      - Any bins that are already being serviced or in the process of being lifted.
       - Any part of the garbage truck's **collection mechanism**, such as the front hopper, arm, or containers.
       - Any bins far ahead or on the opposite side of the street.
       

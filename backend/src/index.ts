@@ -44,6 +44,7 @@ const upload = multer({
 const processingStatus = new Map<string, { 
   status: string; 
   events: any[];
+  frames?: any[];
   message?: string;
   totalFrames?: number;
   processedFrames?: number;
@@ -98,8 +99,8 @@ app.get('/results/:fileId', (req, res) => {
     return res.status(400).json({ error: 'Processing not complete' });
   }
 
-  console.log(`✅ Sending results for ${fileId}: ${status.events.length} events found`);
-  res.json({ events: status.events });
+  console.log(`✅ Sending results for ${fileId}: ${status.events.length} events found, ${status.frames?.length || 0} frames`);
+  res.json({ events: status.events, frames: status.frames || [] });
 });
 
 // New route to clear uploads
@@ -134,57 +135,88 @@ app.post('/clear', async (req, res) => {
   }
 });
 
+// Add this route after the other routes
+app.post('/feedback/:fileId/:frameId', (req, res) => {
+  const { fileId, frameId } = req.params;
+  const { humanFeedback } = req.body;
+  const status = processingStatus.get(fileId);
+  if (!status || !status.frames) {
+    return res.status(404).json({ error: 'File or frames not found' });
+  }
+  const frame = status.frames.find(f => f.id === frameId);
+  if (!frame) {
+    return res.status(404).json({ error: 'Frame not found' });
+  }
+  frame.humanFeedback = humanFeedback;
+  res.json({ message: 'Feedback saved', frame });
+});
+
+// Add this route after the feedback route for frames
+app.post('/event-feedback/:fileId/:eventId', (req, res) => {
+  const { fileId, eventId } = req.params;
+  const { humanFeedback } = req.body;
+  const status = processingStatus.get(fileId);
+  if (!status || !status.events) {
+    return res.status(404).json({ error: 'File or events not found' });
+  }
+  const event = status.events.find(e => e.id === eventId);
+  if (!event) {
+    return res.status(404).json({ error: 'Event not found' });
+  }
+  event.humanFeedback = humanFeedback;
+  res.json({ message: 'Event feedback saved', event });
+});
+
 async function processVideo(fileId: string, videoPath: string) {
   try {
     console.log(`🎥 Starting frame extraction for ${fileId}`);
     // Extract frames
     const frames = await videoProcessor.extractFrames(videoPath);
     console.log(`✅ Extracted ${frames.length} frames from video`);
-    
-    // Update status with total frames
-    processingStatus.set(fileId, {
-      status: 'processing',
-      events: [],
-      message: `Processing ${frames.length} frames...`,
-      totalFrames: frames.length,
-      processedFrames: 0
-    });
-    
-    // Process each frame with LLM
+
+    // We'll build up frameObjs as we process each frame
+    const frameObjs = [];
     const events = [];
     const startTime = Date.now();
-    
+
     for (let i = 0; i < frames.length; i++) {
       const frame = frames[i];
       const frameStartTime = Date.now();
-      
+      let event: any = await llmService.analyzeFrame(frame.framePath, frame.timestamp);
+      const frameTime = Date.now() - frameStartTime;
+
+      let reason = 'not flagged';
+      let eventType = undefined;
+      let location = '[gps location here]'; // Placeholder, update if you have real data
+      if (event) {
+        reason = event.reason || 'flagged by model';
+        eventType = event.eventType;
+        location = event.location || location;
+        events.push({
+          ...event,
+          reason,
+          location,
+          thumbnailUrl: `uploads/${path.relative('uploads', frame.framePath).replace(/\\/g, '/')}`,
+        });
+      }
+      frameObjs.push({
+        id: `${fileId}-frame-${i}`,
+        timestamp: frame.timestamp,
+        thumbnailUrl: `uploads/${path.relative('uploads', frame.framePath).replace(/\\/g, '/')}`,
+        reason,
+        eventType: eventType || 'not flagged',
+        location,
+      });
+
       // Update processing status
       processingStatus.set(fileId, {
         status: 'processing',
         events,
+        frames: frameObjs,
         message: `Processing frame ${i + 1}/${frames.length} (${Math.round((i / frames.length) * 100)}%)`,
         totalFrames: frames.length,
         processedFrames: i
       });
-
-      const event = await llmService.analyzeFrame(frame.framePath, frame.timestamp);
-      const frameTime = Date.now() - frameStartTime;
-      
-      if (event) {
-        console.log(`✅ Found event: ${event.eventType} at ${frame.timestamp} (took ${frameTime}ms)`);
-        events.push(event);
-        
-        // Update status with new event
-        processingStatus.set(fileId, {
-          status: 'processing',
-          events,
-          message: `Found ${events.length} events so far (${Math.round(((i + 1) / frames.length) * 100)}% complete)`,
-          totalFrames: frames.length,
-          processedFrames: i + 1
-        });
-      } else {
-        console.log(`ℹ️ No events in frame at ${frame.timestamp} (took ${frameTime}ms)`);
-      }
     }
 
     const totalTime = Date.now() - startTime;
@@ -194,6 +226,7 @@ async function processVideo(fileId: string, videoPath: string) {
     processingStatus.set(fileId, {
       status: 'completed',
       events,
+      frames: frameObjs,
       message: `Processing complete. Found ${events.length} events in ${frames.length} frames.`,
       totalFrames: frames.length,
       processedFrames: frames.length
@@ -204,6 +237,7 @@ async function processVideo(fileId: string, videoPath: string) {
     processingStatus.set(fileId, {
       status: 'failed',
       events: [],
+      frames: [],
       message: 'Processing failed. Please try again.'
     });
   }
