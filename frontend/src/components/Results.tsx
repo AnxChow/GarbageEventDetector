@@ -9,6 +9,7 @@ interface Event {
   driver: string;
   thumbnailUrl: string;
   humanFeedback?: string;
+  reason?: string;
 }
 
 interface Frame {
@@ -103,6 +104,12 @@ const Results = () => {
       alert('Failed to save event feedback');
     }
   };
+
+  // Sort events by timestamp before rendering
+  const sortedEvents = [...events].sort((a, b) => {
+    // Compare as time strings (HH:MM:SS)
+    return a.timestamp.localeCompare(b.timestamp);
+  });
 
   return (
     <div style={{ minHeight: '100vh' }}>
@@ -218,9 +225,26 @@ const Results = () => {
               alt={`Frame at ${modalFrame.timestamp}`}
               style={{ width: 280, height: 180, objectFit: 'cover', borderRadius: 8, marginBottom: 24 }}
             />
+            {/* Event label with neutral color */}
+            {modalFrame.eventType && modalFrame.eventType !== 'not flagged' && (
+              <span
+                style={{
+                  display: 'inline-block',
+                  background: '#9ca3af', // light gray
+                  color: '#fff',
+                  padding: '2px 10px',
+                  borderRadius: 6,
+                  fontWeight: 600,
+                  margin: '8px 0',
+                  fontSize: 18,
+                }}
+              >
+                {modalFrame.eventType}
+              </span>
+            )}
             {/* Feedback buttons */}
             <div style={{ width: '100%', marginTop: 16 }}>
-              <div style={{ fontWeight: 600, marginBottom: 8, textAlign: 'center' }}>Mark Event:</div>
+              <div style={{ fontWeight: 600, marginBottom: 8, textAlign: 'center', color: '#374151' }}>Mark Event:</div>
               <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
                 <button
                   onClick={() => handleFeedback(modalFrame, 'inaccessible')}
@@ -283,12 +307,12 @@ const Results = () => {
             </button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
-            {events.length === 0 ? (
+            {sortedEvents.length === 0 ? (
               <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#6b7280', fontSize: 18, padding: '48px 0' }}>
                 No events to report
               </div>
             ) : (
-              events.map((event) => (
+              sortedEvents.map((event) => (
                 <div key={event.id} style={{ background: 'white', borderRadius: 8, boxShadow: '0 1px 4px #e5e7eb', overflow: 'hidden', position: 'relative' }}>
                   {/* Flag icon for feedback */}
                   <div
@@ -344,7 +368,29 @@ const Results = () => {
                   />
                   <div style={{ padding: 16 }}>
                     <p style={{ fontSize: 14, color: '#6b7280' }}>{event.timestamp}</p>
-                    <h3 style={{ fontWeight: 600, marginTop: 4 }}>{event.eventType}</h3>
+                    {/* Event label with color */}
+                    {event.eventType && event.eventType !== 'not flagged' && (
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          background: '#9ca3af', // light gray
+                          color: '#fff',
+                          padding: '2px 10px',
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          margin: '8px 0',
+                          fontSize: 18,
+                        }}
+                      >
+                        {event.eventType}
+                      </span>
+                    )}
+                    {/* Show reason below the event label */}
+                    {event.reason && (
+                      <div style={{ color: '#374151', fontSize: 14, margin: '6px 0 0 0' }}>
+                        <strong>Reason:</strong> {event.reason}
+                      </div>
+                    )}
                     <p style={{ fontSize: 14, color: '#4b5563', marginTop: 4 }}>Location: {event.location}</p>
                     <p style={{ fontSize: 14, color: '#4b5563' }}>Driver: {event.driver}</p>
                   </div>
@@ -397,7 +443,7 @@ const Results = () => {
             >
               ×
             </button>
-            <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 16 }}>Flag incorrect event?</div>
+            <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 16, color: '#374151' }}>Flag incorrect event?</div>
             <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
               <button
                 onClick={() => handleEventFeedback(eventModal, 'wrong event type')}

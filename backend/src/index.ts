@@ -175,48 +175,67 @@ async function processVideo(fileId: string, videoPath: string) {
     console.log(`✅ Extracted ${frames.length} frames from video`);
 
     // We'll build up frameObjs as we process each frame
-    const frameObjs = [];
-    const events = [];
+    const frameObjs: any[] = [];
+    const events: any[] = [];
     const startTime = Date.now();
+    const concurrency = 5;
+    let processedFrames = 0;
 
-    for (let i = 0; i < frames.length; i++) {
-      const frame = frames[i];
-      const frameStartTime = Date.now();
-      let event: any = await llmService.analyzeFrame(frame.framePath, frame.timestamp);
-      const frameTime = Date.now() - frameStartTime;
+    // Helper to wait
+    const wait = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-      let reason = 'not flagged';
-      let eventType = undefined;
-      let location = '[gps location here]'; // Placeholder, update if you have real data
-      if (event) {
-        reason = event.reason || 'flagged by model';
-        eventType = event.eventType;
-        location = event.location || location;
-        events.push({
-          ...event,
-          reason,
-          location,
+    // Helper to process a single frame
+    const processFrame = async (frame: any, i: number) => {
+      console.log(`[Frame ${i}] Starting analysis at ${frame.timestamp}`);
+      try {
+        let event: any = await llmService.analyzeFrame(frame.framePath, frame.timestamp);
+        console.log(`[Frame ${i}] Analysis complete:`, event);
+        let eventType = 'not flagged';
+        let reason = 'not flagged';
+        let location = '[gps location here]';
+        if (event) {
+          eventType = event.eventType || 'not flagged';
+          reason = event.reason || 'flagged by model';
+          location = event.location || location;
+          events.push({
+            ...event,
+            reason: event.reason || reason,
+            location,
+            thumbnailUrl: `uploads/${path.relative('uploads', frame.framePath).replace(/\\/g, '/')}`,
+          });
+        }
+        frameObjs[i] = {
+          id: `${fileId}-frame-${i}`,
+          timestamp: frame.timestamp,
           thumbnailUrl: `uploads/${path.relative('uploads', frame.framePath).replace(/\\/g, '/')}`,
+          reason,
+          eventType,
+          location,
+        };
+        processedFrames++;
+        // Update processing status for progress
+        processingStatus.set(fileId, {
+          status: 'processing',
+          events,
+          frames: frameObjs,
+          message: `Processing frame ${processedFrames}/${frames.length} (${Math.round((processedFrames / frames.length) * 100)}%)`,
+          totalFrames: frames.length,
+          processedFrames,
         });
+      } catch (error) {
+        console.error(`[Frame ${i}] Error during analysis:`, error);
       }
-      frameObjs.push({
-        id: `${fileId}-frame-${i}`,
-        timestamp: frame.timestamp,
-        thumbnailUrl: `uploads/${path.relative('uploads', frame.framePath).replace(/\\/g, '/')}`,
-        reason,
-        eventType: eventType || 'not flagged',
-        location,
-      });
+    };
 
-      // Update processing status
-      processingStatus.set(fileId, {
-        status: 'processing',
-        events,
-        frames: frameObjs,
-        message: `Processing frame ${i + 1}/${frames.length} (${Math.round((i / frames.length) * 100)}%)`,
-        totalFrames: frames.length,
-        processedFrames: i
-      });
+    // Process frames in parallel batches
+    for (let i = 0; i < frames.length; i += concurrency) {
+      const batch = frames.slice(i, i + concurrency);
+      console.log(`Starting batch ${i / concurrency + 1}: frames ${i} to ${i + batch.length - 1}`);
+      await Promise.all(batch.map((frame, idx) => processFrame(frame, i + idx)));
+      console.log(`Finished batch ${i / concurrency + 1}`);
+      if (i + concurrency < frames.length) {
+        await wait(700); // Wait 700ms between batches
+      }
     }
 
     const totalTime = Date.now() - startTime;

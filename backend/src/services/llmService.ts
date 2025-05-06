@@ -8,6 +8,7 @@ interface Event {
   location: string;
   driver: string;
   thumbnailUrl: string;
+  reason: string;
 }
 
 type EventType = 'inaccessible' | 'overflowing' | 'other' | null;
@@ -23,28 +24,31 @@ export class LLMService {
 
   async analyzeFrame(framePath: string, timestamp: string): Promise<Event | null> {
     try {
-      // Read the image file and convert to base64
+      // Read the image file
       const imageBuffer = await fs.readFile(framePath);
+
+      // Use the original image for LLM
       const base64Image = imageBuffer.toString('base64');
 
       // Step 1: Check if there are bins ready for pickup
       const binCheckPrompt = `You are analyzing a single frame from a garbage truck's dashcam at timestamp ${timestamp}.
 
-      Your task is to determine whether there are any **trash bins** that meet the following criteria:
-      
-      1. The bin is **close to the side of the truck** and appears to be the **next target for pickup**.
-      2. The bin is **clearly visible and identifiable** as a standard trash bin.
-      
-      🚫 Ignore:
-      - Any part of the garbage truck's **collection mechanism**, such as the front hopper, arm, or containers.
-      - Any bins far ahead or on the opposite side of the street.
-      
-      ✅ Focus only on the **side of the truck visible in the frame**, and only if the bins appear to be **immediately ready for pickup**.
-      
-      IMPORTANT: Return ONLY a valid JSON object in this exact format, with no additional text or markdown:
-      {"binsPresent": true/false, "reason": "brief explanation"}
-      
-      Be conservative. Only return "binsPresent": true if there is clear and confident visual evidence of bins on the ground, at the side, ready to be serviced. The bins you identify should NOT be the garbage truck's own collection bin.`;
+            Your task is to determine whether **any trash or recycling bins** are visible in the frame.
+
+            ✅ Bins usually appear:
+            - In the **bottom-left or bottom-right corner** of the frame (close to the truck)
+            - Standing upright on the **side of the road**
+
+            🚫 Ignore:
+            - Any part of the garbage truck's **collection mechanism**, such as the front hopper, arm, or containers.
+            - Any bins currently in the air or inside the truck
+
+            Return your answer in this exact JSON format:
+            { "binsPresent": true/false, "reason": "brief explanation" }
+                
+                
+            Be inclusive — return true if you see any bins, even if they are not perfectly visible or close.
+            The bins you identify should NOT be the garbage truck's own collection bin.`;
 
       const binCheckResponse = await this.openai.chat.completions.create({
         model: "o4-mini",
@@ -85,24 +89,36 @@ export class LLMService {
       }
 
       // Step 2: Check for specific issues with the bins
-      const issueCheckPrompt = `You are analyzing a frame that has been confirmed to contain trash bins ready for pickup. 
-      Your task is to determine if there are any clear issues that would prevent normal pickup.
+      const issueCheckPrompt = `You are analyzing a frame that contains at least one trash or recycling bin. Please focus only on the black bins on the right side of the road.
 
-      Check for the following issues, but only if they are clearly visible and unambiguous:
+Your task is to determine if there is a clear and visible issue worth flagging. 
 
-      1. **"inaccessible"** — The bin is on the ground and will not be accessible for pick up because:
-         - It is blocked by another object (e.g. another bin, car, pole, fence).
-         - It is distanced from the pickup area or squeezed between objects with no visible space for the arm.
+Check for the following types of events:
 
-      2. **"overflowing"** — The bin is on the ground and clearly overfilled:
-         - The lid is visibly propped open by large trash items.
-         - Trash is sticking out, visibly overflowing, or surrounding the bin.
-         - ⚠️ Do not report "overflowing" if the lid is only slightly open, or the bin looks full but not spilling.
+---
 
-      IMPORTANT: Return ONLY a valid JSON object in this exact format, with no additional text or markdown:
-      {"eventFound": "inaccessible" | "overflowing" | "other" | null, "reason": "brief explanation"}
+1. **"inaccessible"** — A bin cannot be picked up because:
+   - It is **blocked** by other bins, objects, cars, or a fence.
+   - It is **facing the wrong direction** (handles/lid turned away from the truck).
+   - It is placed **on the sidewalk** instead of the road.
+   - ✅ Only report "inaccessible" if the bin is **clearly unreachable or improperly placed**. 
 
-      Be conservative — if it is not clearly visible and unambiguous, return null.`;
+2. **"overflowing"** — A bin is clearly too full:
+   - The **lid is propped open** by trash sticking out.
+   - Large items or excess waste are **around the bin**.
+   - ⚠️ Do **not** confuse the truck's own **front holder or arm** with a bin — only report ground bins.
+
+3. **"safety"** — A visible hazard from the driver's perspective:
+   - A **person**, child, or pedestrian is on or near the road.
+   - An object is **obstructing the truck's path** (e.g. a bike, debris, animal, etc.). Do not confuse the truck's front holder as an obstruction, only things actually on the road.
+
+4. **"other"** — Any clearly visible, unusual situation not described above.
+
+---
+
+Return your result in this exact JSON format:
+{ "eventFound": "inaccessible" | "overflowing" | "safety" | "other" | null, "reason": "brief explanation" }
+`;
 
       const issueCheckResponse = await this.openai.chat.completions.create({
         model: "o4-mini",
@@ -146,6 +162,7 @@ export class LLMService {
         id: Date.now().toString(),
         timestamp,
         eventType: issueCheckResult.eventFound,
+        reason: issueCheckResult.reason,
         location: "[gps location here]", // You can update this if you want to extract location
         driver: "[driver name here]", // You can update this if you want to extract driver info
         thumbnailUrl: framePath
