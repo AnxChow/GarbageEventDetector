@@ -63,7 +63,7 @@ const VideoUpload = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 mb-24">
       <div className="w-full max-w-2xl">
         <div
           className={`p-8 rounded-lg border-2 border-dashed ${
